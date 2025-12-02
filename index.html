@@ -37,7 +37,7 @@ const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.go
 function handleCredentialResponse(response) {
   // Exchange ID token for access token
   tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: "YOUR_GOOGLE_CLIENT_ID",
+    client_id: "292288015242-3h145r1qsidga3nr4ldcgeu8huhm31cq.apps.googleusercontent.com",
     scope: SCOPES,
     callback: (resp) => {
       if (resp.access_token) {
@@ -110,4 +110,5 @@ async function loadEmails() {
 }
 </script>
 </body>
+
 </html>
