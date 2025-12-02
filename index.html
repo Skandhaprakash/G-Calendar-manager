@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Calendar Manager (Google)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js"></script>
+</head>
+<body>
+  <h1>Calendar Manager (Google)</h1>
+  <div id="auth">
+    <div id="g_id_onload"
+         data-client_id="YOUR_GOOGLE_CLIENT_ID"
+         data-context="signin"
+         data-ux_mode="popup"
+         data-callback="handleCredentialResponse"
+         data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+    <button onclick="signOut()">Sign out</button>
+  </div>
+
+  <h2>Morning Outlook</h2>
+  <div id="morning"></div>
+
+  <h2>Email Summary</h2>
+  <div id="emails"></div>
+
+  <h2>Evening Check-in</h2>
+  <div id="evening"></div>
+
+<script>
+let tokenClient, gapiInited = false, gisInited = false;
+const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly';
+
+function handleCredentialResponse(response) {
+  // Exchange ID token for access token
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: "YOUR_GOOGLE_CLIENT_ID",
+    scope: SCOPES,
+    callback: (resp) => {
+      if (resp.access_token) {
+        gapi.client.setToken({access_token: resp.access_token});
+        loadCalendar();
+        loadEmails();
+      }
+    }
+  });
+  tokenClient.requestAccessToken();
+}
+
+function gapiLoaded() {
+  gapi.load('client', initializeGapiClient);
+}
+function initializeGapiClient() {
+  gapi.client.init({
+    discoveryDocs: [
+      "https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest",
+      "https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest"
+    ]
+  }).then(() => { gapiInited = true; });
+}
+window.onload = gapiLoaded;
+
+function signOut() {
+  google.accounts.oauth2.revoke(gapi.client.getToken().access_token, () => {
+    gapi.client.setToken('');
+    document.getElementById('morning').innerHTML = '';
+    document.getElementById('emails').innerHTML = '';
+  });
+}
+
+async function loadCalendar() {
+  const now = new Date().toISOString();
+  const tomorrow = new Date(Date.now() + 24*3600*1000).toISOString();
+  const resp = await gapi.client.calendar.events.list({
+    calendarId: 'primary',
+    timeMin: now,
+    timeMax: tomorrow,
+    singleEvents: true,
+    orderBy: 'startTime'
+  });
+  const events = resp.result.items;
+  let html = '<ul>';
+  events.forEach(ev => {
+    html += `<li>${ev.start.dateTime || ev.start.date} – ${ev.summary}</li>`;
+  });
+  html += '</ul>';
+  document.getElementById('morning').innerHTML = html;
+}
+
+async function loadEmails() {
+  const resp = await gapi.client.gmail.users.messages.list({
+    userId: 'me',
+    maxResults: 10,
+    q: 'newer_than:1d'
+  });
+  const msgs = resp.result.messages || [];
+  let html = '<ul>';
+  for (const m of msgs) {
+    const full = await gapi.client.gmail.users.messages.get({userId:'me', id:m.id});
+    const headers = full.result.payload.headers;
+    const from = headers.find(h=>h.name==='From')?.value || '';
+    const subject = headers.find(h=>h.name==='Subject')?.value || '';
+    html += `<li>${from} — ${subject}</li>`;
+  }
+  html += '</ul>';
+  document.getElementById('emails').innerHTML = html;
+}
+</script>
+</body>
+</html>
